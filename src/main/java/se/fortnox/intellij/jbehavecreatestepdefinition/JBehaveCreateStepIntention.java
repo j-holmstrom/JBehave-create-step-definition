@@ -18,6 +18,7 @@ import com.intellij.psi.PsiClass;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementFactory;
 import com.intellij.psi.PsiFile;
+import com.intellij.psi.PsiInvalidElementAccessException;
 import com.intellij.psi.PsiJavaFile;
 import com.intellij.psi.PsiManager;
 import com.intellij.psi.PsiMethod;
@@ -28,6 +29,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.intellij.openapi.module.ModuleUtilCore.findModuleForFile;
@@ -36,7 +38,7 @@ import static java.util.Collections.emptyList;
 
 public class JBehaveCreateStepIntention extends PsiElementBaseIntentionAction implements IntentionAction {
 
-	public static final String STEP_TEMPLATE = "@%s(\"%s\")\npublic void %s (%s)\n{\n\t//Not implemented\n}";
+	private static final String STEP_TEMPLATE = "@%s(\"%s\")\npublic void %s (%s)\n{\n\t//Not implemented\n}";
 
 	@NotNull
 	@Override
@@ -52,53 +54,76 @@ public class JBehaveCreateStepIntention extends PsiElementBaseIntentionAction im
 
 	@Override
 	public boolean isAvailable(@NotNull Project project, Editor editor, @NotNull PsiElement element) {
-		return "story".equals(element.getContainingFile().getVirtualFile().getExtension());
+		String currentFileExtension = element.getContainingFile().getVirtualFile().getExtension();
+		return "story".equals(currentFileExtension);
 	}
 
 	@Override
 	public void invoke(@NotNull Project project, Editor editor, @NotNull PsiElement element) {
-		JBehaveStep step = parseJBehaveStep(element, editor);
-
-		if (step == null || step.getStepType() == null || step.getStepBody() == null) {
-			JBehaveErrorNotifier.notify("Failed to parse step. It is probably not a valid JBehave step.");
+		//Parse step
+		Optional<JBehaveStep> step = parseJBehaveStep(element, editor);
+		if (!step.isPresent()) {
 			return;
 		}
 
+		//Find possible step classes where we can put our step implementation
 		VirtualFile  storyFile   = element.getContainingFile().getVirtualFile();
 		List<String> stepClasses = getPossibleStepImplementationClassNames(project, storyFile);
 		if (stepClasses.isEmpty()) {
-			JBehaveErrorNotifier.notify("Could not find any valid step classes. This plugin can only handle step classes added to the super method call right now.");
-		} else {
-			JBPopup jbPopup = JBPopupFactory.getInstance().createPopupChooserBuilder(stepClasses)
-				.setTitle("Pick Stepfile")
-				.setItemChosenCallback(stepClassName -> createStepDefinitionInClass(project, step, stepClassName))
-				.createPopup();
-			jbPopup.showInBestPositionFor(editor);
+			return;
 		}
+
+		//Let user pick which class to insert the step implementation in
+		JBPopup jbPopup = JBPopupFactory.getInstance().createPopupChooserBuilder(stepClasses)
+			.setTitle("Pick Stepfile")
+			.setItemChosenCallback(stepClassName -> createStepDefinitionInClass(project, step.get(), stepClassName))
+			.createPopup();
+		jbPopup.showInBestPositionFor(editor);
 	}
 
-	private JBehaveStep parseJBehaveStep(PsiElement element, Editor editor) {
+	private Optional<JBehaveStep> parseJBehaveStep(PsiElement element, Editor editor) {
 		try {
 			String       storyFileText            = element.getContainingFile().getText();
 			String       untilCursor              = storyFileText.substring(0, editor.getCaretModel().getOffset());
 			String       fromCursorIncludingStart = storyFileText.substring(untilCursor.lastIndexOf("\n") + 1);
 			String       wholeStep                = fromCursorIncludingStart.substring(0, fromCursorIncludingStart.indexOf("\n"));
 			String       stepBody                 = StringUtil.trim(wholeStep.substring(wholeStep.indexOf(" ")));
-			JBehaveStory story                    = new JBehaveStory(Arrays.asList(storyFileText.split("\n")));
-			return story.getSteps()
+			JBehaveStory story                    = JBehaveStory.fromText(storyFileText);
+			Optional<JBehaveStep> optionalStep = story.getSteps()
 				.stream()
 				.filter(s -> s.getStepBody().equals(stepBody))
-				.findFirst()
-				.orElse(null);
-		} catch (RuntimeException e) {
-			return null;
+				.findFirst();
+			if (!optionalStep.isPresent() || optionalStep.get().getStepType() == null || optionalStep.get().getStepBody() == null) {
+				JBehaveErrorNotifier.notify("Failed to parse step. It is probably not a valid JBehave step.");
+				return Optional.empty();
+			}
+			return optionalStep;
+		} catch (IndexOutOfBoundsException | PsiInvalidElementAccessException e) {
+			return Optional.empty();
 		}
 	}
 
 	private void createStepDefinitionInClass(Project project, JBehaveStep step, String stepClassName) {
+		PsiMethod stepDefinitionMethod = createStepDefinitionMethod(project, step);
+		addMethodToClass(project, stepClassName, stepDefinitionMethod);
+	}
+
+	private void addMethodToClass(Project project, String stepClassName, PsiMethod stepDefinitionMethod) {
+		Optional<PsiClass> mainClass = getStepImplementationClass(project, stepClassName);
+		if (!mainClass.isPresent()) {
+			return;
+		}
+
+		WriteCommandAction.runWriteCommandAction(project, () -> {
+			mainClass.get().add(stepDefinitionMethod);
+		});
+	}
+
+	@NotNull
+	private PsiMethod createStepDefinitionMethod(Project project, JBehaveStep step) {
 		final PsiElementFactory factory     = JavaPsiFacade.getInstance(project).getElementFactory();
 		final CodeStyleManager  codeStylist = CodeStyleManager.getInstance(project);
-		PsiMethod method = (PsiMethod)codeStylist.reformat(
+		return (PsiMethod)codeStylist.reformat(
 			factory.createMethodFromText(
 				format(STEP_TEMPLATE,
 					step.getStepType(),
@@ -108,15 +133,9 @@ public class JBehaveCreateStepIntention extends PsiElementBaseIntentionAction im
 				null
 			)
 		);
-		PsiClass mainClass = getStepImplementationClass(project, stepClassName);
-		if(mainClass != null) {
-			WriteCommandAction.runWriteCommandAction(project, () -> {
-				mainClass.add(method);
-			});
-		}
 	}
 
-	private PsiClass getStepImplementationClass(Project project, String stepsClassName) {
+	private Optional<PsiClass> getStepImplementationClass(Project project, String stepsClassName) {
 		FileEditorManager fileEditorManager = FileEditorManager.getInstance(project);
 		VirtualFile[]     selectedFiles     = fileEditorManager.getSelectedFiles();
 		VirtualFile       file              = selectedFiles[0];
@@ -124,11 +143,11 @@ public class JBehaveCreateStepIntention extends PsiElementBaseIntentionAction im
 		try {
 			Module    module   = findModuleForFile(file, project);
 			PsiFile[] psiFiles = FilenameIndex.getFilesByName(project, stepsClassName.replace(".class", ".java"), GlobalSearchScope.moduleScope(module));
-			return ((PsiJavaFile)psiFiles[0]).getClasses()[0];
+			return Optional.of(((PsiJavaFile)psiFiles[0]).getClasses()[0]);
 
-		} catch(Exception e) {
+		} catch (Exception e) {
 			JBehaveErrorNotifier.notify("Could not find steps definition file named " + stepsClassName);
-			return null;
+			return Optional.empty();
 		}
 	}
 
@@ -143,11 +162,16 @@ public class JBehaveCreateStepIntention extends PsiElementBaseIntentionAction im
 			int    startOfSuper           = storyClassContent.indexOf("super(") + 6;
 			String tmp                    = storyClassContent.substring(startOfSuper);
 			String storyClassSuperContent = tmp.substring(0, tmp.indexOf(")"));
-			return Arrays.stream(storyClassSuperContent
+			List<String> possibleStepImplementationClassNames = Arrays.stream(storyClassSuperContent
 				.split(","))
 				.filter(argument -> argument.endsWith(".class"))
 				.map(classFileName -> classFileName.replace(".class", ".java").trim())
 				.collect(Collectors.toList());
+
+			if (possibleStepImplementationClassNames.isEmpty()) {
+				JBehaveErrorNotifier.notify("Could not find any valid step classes. This plugin can only handle step classes added to the super method call right now.");
+			}
+			return possibleStepImplementationClassNames;
 		} catch (Exception ex) {
 			JBehaveErrorNotifier.notify("Found story class but could not find any step classes in the super method call.");
 			return emptyList();

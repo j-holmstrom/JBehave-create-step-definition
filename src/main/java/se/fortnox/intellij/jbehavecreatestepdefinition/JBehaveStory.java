@@ -1,7 +1,5 @@
 package se.fortnox.intellij.jbehavecreatestepdefinition;
 
-import com.intellij.openapi.util.text.StringUtil;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -21,11 +19,16 @@ public class JBehaveStory {
 
 	private final List<JBehaveStep> steps;
 
-	public JBehaveStory(List<String> stepsAsStrings) {
-		List<JBehaveStep> steps    = new ArrayList<>();
-		Optional<String>  lastType = Optional.empty();
+	public JBehaveStory(List<JBehaveStep> steps) {
+		this.steps = steps;
+	}
+
+	public static JBehaveStory fromText(String storyAsText) {
+		List<String>      stepsAsStrings = Arrays.asList(storyAsText.split("\n"));
+		List<JBehaveStep> steps          = new ArrayList<>();
+		Optional<String>  lastType       = Optional.empty();
 		for (String stepAsString : stepsAsStrings) {
-			if(stepAsString.isEmpty()) {
+			if (stepAsString.isEmpty()) {
 				lastType = Optional.empty();
 				continue;
 			}
@@ -34,10 +37,10 @@ public class JBehaveStory {
 				continue;
 			}
 			String lowercasePrefix = stepAsString.substring(0, stepAsString.indexOf(" ")).toLowerCase();
-			String stepBody = stepAsString.substring(endOfPrefix + 1);
+			String stepBody        = stepAsString.substring(endOfPrefix + 1);
 			if (GIVEN.contains(lowercasePrefix)) {
 				lastType = Optional.of(GIVEN_PREFIX);
-				steps.add(new JBehaveStep(GIVEN_PREFIX,	stepBody));
+				steps.add(new JBehaveStep(GIVEN_PREFIX, stepBody));
 			} else if (WHEN.contains(lowercasePrefix)) {
 				lastType = Optional.of(WHEN_PREFIX);
 				steps.add(new JBehaveStep(WHEN_PREFIX, stepBody));
@@ -53,7 +56,7 @@ public class JBehaveStory {
 				steps.get(steps.size() - 1).setIsMapStep(true);
 			}
 		}
-		this.steps = steps;
+		return new JBehaveStory(steps);
 	}
 
 	public List<JBehaveStep> getSteps() {
