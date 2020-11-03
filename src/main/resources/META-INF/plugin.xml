@@ -1,0 +1,17 @@
+<idea-plugin>
+	<id>jbehave-create-step-definition</id>
+	<name>JBehave create step definition</name>
+	<vendor email="jesper.holmstrom@fortnox.se">j-holmstrom</vendor>
+
+	<description>Alt+Enter on a step in a story file to create step definition</description>
+
+	<extensions defaultExtensionNs="com.intellij">
+		<intentionAction>
+			<className>se.fortnox.intellij.jbehavecreatestepdefinition.JBehaveCreateStepIntention</className>
+		</intentionAction>
+	</extensions>
+
+	<depends>com.intellij.modules.java</depends>
+
+	<idea-version since-build="183" />
+</idea-plugin>

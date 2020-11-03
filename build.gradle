@@ -1,0 +1,36 @@
+plugins {
+    id 'java'
+    id 'org.jetbrains.intellij' version '0.4.10'
+}
+
+group 'se.fortnox.jbehavecreatestepdefinition'
+version '0.1'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    provided
+}
+
+sourceSets {
+    main { compileClasspath += configurations.provided }
+}
+
+// See https://github.com/JetBrains/gradle-intellij-plugin/
+intellij {
+    version '2019.1.3'
+    updateSinceUntilBuild = false
+}
+
+patchPluginXml {
+    changeNotes """
+        <p>0.1:</p>
+        <ul>
+            <li>Alt+Enter when caret is on a .story step to generate step definition</li>
+        </ul>
+        """
+}
