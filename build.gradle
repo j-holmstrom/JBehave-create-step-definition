@@ -26,6 +26,16 @@ intellij {
     updateSinceUntilBuild = false
 }
 
+dependencies {
+    testImplementation 'org.assertj:assertj-core:1.7.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.6.0'
+}
+
+test {
+    useJUnitPlatform()
+}
+
 patchPluginXml {
     changeNotes """
         <p>0.1:</p>
