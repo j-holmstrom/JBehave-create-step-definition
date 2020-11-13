@@ -9,6 +9,15 @@
 		<intentionAction>
 			<className>se.fortnox.intellij.jbehavecreatestepdefinition.JBehaveCreateStepIntention</className>
 		</intentionAction>
+
+		<intentionAction>
+			<className>se.fortnox.intellij.internalauthhelper.GenerateAuthIntention</className>
+		</intentionAction>
+
+		<applicationService serviceImplementation="se.fortnox.intellij.PluginSettingsState"/>
+		<applicationConfigurable parentId="tools" instance="se.fortnox.intellij.PluginSettingsConfigurable"
+		                         id="se.fortnox.intellij.PluginSettingsConfigurable"
+		                         displayName="Fortnox utility settings"/>
 	</extensions>
 
 	<depends>com.intellij.modules.java</depends>
