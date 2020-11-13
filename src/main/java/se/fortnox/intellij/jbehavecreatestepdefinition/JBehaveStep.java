@@ -2,6 +2,7 @@ package se.fortnox.intellij.jbehavecreatestepdefinition;
 
 import org.apache.commons.lang.StringUtils;
 
+import java.text.Normalizer;
 import java.util.Objects;
 
 public class JBehaveStep {
@@ -40,18 +41,18 @@ public class JBehaveStep {
 	}
 
 	public String getStepNameWithParameters() {
-		if(isTableStep) {
+		if (isTableStep) {
 			return stepText + " $table";
-		} else if(isMapStep) {
+		} else if (isMapStep) {
 			return stepText + " $map";
 		}
 		return stepText;
 	}
 
 	public String getStepParameters() {
-		if(isTableStep) {
+		if (isTableStep) {
 			return "ExamplesTable table";
-		} else if(isMapStep) {
+		} else if (isMapStep) {
 			return "Map<String, String> map";
 		}
 		return "";
@@ -73,8 +74,9 @@ public class JBehaveStep {
 	}
 
 	public String getSuggestedMethodName() {
-		String   suggestedName = this.stepType.toLowerCase();
-		String[] stepTextWords = this.stepText.replaceAll("[^a-zA-Z0-9 ]", "").split(" ");
+		String   suggestedName             = this.stepType.toLowerCase();
+		String   stepTextWithoutDiacritics = Normalizer.normalize(this.stepText, Normalizer.Form.NFD);
+		String[] stepTextWords             = stepTextWithoutDiacritics.replaceAll("[^a-zA-Z0-9 ]", "").split(" ");
 		for (int i = 0; i < stepTextWords.length; i++) {
 			String word = stepTextWords[i];
 			if (StringUtils.isNotBlank(word)) {
@@ -83,6 +85,5 @@ public class JBehaveStep {
 		}
 		return suggestedName;
 	}
-
 
 }
