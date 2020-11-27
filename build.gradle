@@ -3,8 +3,8 @@ plugins {
     id 'org.jetbrains.intellij' version '0.4.10'
 }
 
-group 'se.fortnox.jbehavecreatestepdefinition'
-version '0.1'
+group 'se.fortnox.intellij.utilities'
+version '0.2'
 
 sourceCompatibility = 1.8
 
@@ -38,6 +38,10 @@ test {
 
 patchPluginXml {
     changeNotes """
+        <p>0.2:</p>
+        <ul>
+            <li>Alt+Enter in a .http file to generate auth headers for internalapi requests.</li>
+        </ul>
         <p>0.1:</p>
         <ul>
             <li>Alt+Enter when caret is on a .story step to generate step definition</li>

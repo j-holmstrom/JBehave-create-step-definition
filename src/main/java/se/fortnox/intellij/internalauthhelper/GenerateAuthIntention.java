@@ -73,7 +73,7 @@ public class GenerateAuthIntention extends PsiElementBaseIntentionAction impleme
 
 	@Override
 	public String getText() {
-		return "Generate internal auth headers";
+		return "DEV: Generate auth headers";
 	}
 
 	@Override
